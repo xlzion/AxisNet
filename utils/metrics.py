@@ -1,0 +1,48 @@
+from math import log10
+import numpy as np
+from sklearn.metrics import roc_auc_score, precision_recall_fscore_support
+from scipy.special import softmax
+
+
+def PSNR(mse, peak=1.0):
+    return 10 * log10((peak ** 2) / mse)
+
+
+class AverageMeter(object):
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
+
+
+def accuracy(preds, labels):
+    correct_prediction = np.equal(np.argmax(preds, 1), labels).astype(np.float32)
+    return np.sum(correct_prediction), np.mean(correct_prediction)
+
+
+def auc(preds, labels, is_logit=True):
+    if is_logit:
+        pos_probs = softmax(preds, axis=1)[:, 1]
+    else:
+        pos_probs = preds[:, 1]
+    try:
+        auc_out = roc_auc_score(labels, pos_probs)
+    except Exception:
+        auc_out = 0
+    return auc_out
+
+
+def prf(preds, labels, is_logit=True):
+    pred_lab = np.argmax(preds, 1)
+    p, r, f, _ = precision_recall_fscore_support(labels, pred_lab, average="binary")
+    return [p, r, f]
