@@ -7,34 +7,45 @@ import torch
 
 class AxisNetOptions:
     def __init__(self, argv=None):
-        parser = argparse.ArgumentParser(description="AxisNet refactor options")
-        parser.add_argument("--train", default=1, type=int, help="train(default) or evaluate")
-        parser.add_argument("--use_cpu", action="store_true", help="use cpu?")
+        parser = argparse.ArgumentParser(description="AxisNet: Multimodal Microbiome-Brain Network Fusion")
 
-        parser.add_argument("--hgc", type=int, default=16, help="hidden units of gconv layer")
-        parser.add_argument("--lg", type=int, default=4, help="number of gconv layers")
-        parser.add_argument("--lr", default=0.01, type=float, help="initial learning rate")
-        parser.add_argument("--wd", default=5e-5, type=float, help="weight decay")
-        parser.add_argument("--num_iter", default=300, type=int, help="number of epochs for training")
-        parser.add_argument("--edropout", type=float, default=0.3, help="edge dropout rate")
-        parser.add_argument("--dropout", default=0.2, type=float, help="ratio of dropout")
-        parser.add_argument("--num_classes", type=int, default=2, help="number of classes")
-        parser.add_argument("--ckpt_path", type=str, default="./save_models/axisnet", help="checkpoint path")
+        # --- Execution Mode ---
+        mode_group = parser.add_argument_group("Execution Mode")
+        mode_group.add_argument("--mode", type=str, default="train", choices=["train", "eval"],
+                                help="Execution mode: 'train' for model training, 'eval' for evaluation")
+        mode_group.add_argument("--seed", type=int, default=123, help="Random seed for reproducibility")
+        mode_group.add_argument("--use_cpu", action="store_true", help="Force CPU usage even if GPU is available")
 
-        parser.add_argument("--use_multimodal", action="store_true", help="enable microbiome data")
-        parser.add_argument("--microbiome_path", type=str, default=None, help="path to microbiome data")
-        parser.add_argument("--contrastive_weight", type=float, default=0.5, help="contrastive loss weight")
-        parser.add_argument("--microbiome_dim", type=int, default=2503, help="microbiome feature dim")
-        parser.add_argument("--microbiome_reg_weight", type=float, default=0.05, help="graph consistency loss")
-        parser.add_argument("--microbiome_warmup_epochs", type=int, default=10, help="warmup epochs")
-        parser.add_argument("--microbiome_top_k", type=int, default=5, help="top-k pseudo-pairing")
-        parser.add_argument("--microbiome_pca_dim", type=int, default=64, help="PCA dimension")
-        parser.add_argument("--drop_age", action="store_true", help="drop age from phenotypes")
-        parser.add_argument("--drop_sex", action="store_true", help="drop sex from phenotypes")
-        parser.add_argument("--seed", type=int, default=123, help="random seed")
-        parser.add_argument("--model_type", type=str, default="enhanced",
-                            choices=["enhanced", "transformer", "gcn_transformer"],
-                            help="model choice")
+        # --- Model Architecture ---
+        arch_group = parser.add_argument_group("Model Architecture")
+        arch_group.add_argument("--model_type", type=str, default="enhanced",
+                                choices=["enhanced", "transformer", "gcn_transformer"],
+                                help="Architecture variant to use")
+        arch_group.add_argument("--hidden_dim", type=int, default=16, help="Hidden units in graph convolution layers")
+        arch_group.add_argument("--num_layers", type=int, default=4, help="Number of graph convolution layers")
+        arch_group.add_argument("--dropout", default=0.2, type=float, help="Node feature dropout rate")
+        arch_group.add_argument("--edge_dropout", type=float, default=0.3, help="Edge dropout rate (variational)")
+        arch_group.add_argument("--num_classes", type=int, default=2, help="Number of output classification classes")
+
+        # --- Training Hyperparameters ---
+        train_group = parser.add_argument_group("Training Hyperparameters")
+        train_group.add_argument("--lr", default=0.01, type=float, help="Initial learning rate")
+        train_group.add_argument("--weight_decay", default=5e-5, type=float, help="Weight decay (L2 penalty)")
+        train_group.add_argument("--epochs", default=300, type=int, help="Maximum number of training epochs")
+        train_group.add_argument("--ckpt_path", type=str, default="./save_models/axisnet",
+                                help="Directory to save/load model checkpoints")
+
+        # --- Multimodal & Microbiome ---
+        multi_group = parser.add_argument_group("Multimodal Integration")
+        multi_group.add_argument("--use_multimodal", action="store_true", help="Enable microbiome-brain fusion")
+        multi_group.add_argument("--microbiome_path", type=str, default=None, help="Path to microbiome data file")
+        multi_group.add_argument("--microbiome_pca_dim", type=int, default=64, help="Dimension of PCA-reduced microbiome features")
+        multi_group.add_argument("--microbiome_top_k", type=int, default=5, help="Top-K neighbors for pseudo-pairing")
+        multi_group.add_argument("--contrastive_weight", type=float, default=0.5, help="Weight for cross-modal contrastive loss")
+        multi_group.add_argument("--consistency_weight", type=float, default=0.05, help="Weight for graph consistency regularization")
+        multi_group.add_argument("--warmup_epochs", type=int, default=10, help="Epochs before starting graph consistency")
+        multi_group.add_argument("--drop_age", action="store_true", help="Exclude age from phenotypic features")
+        multi_group.add_argument("--drop_sex", action="store_true", help="Exclude sex from phenotypic features")
 
         args = parser.parse_args(argv)
         args.time = datetime.datetime.now().strftime("%y%m%d")
@@ -43,18 +54,16 @@ class AxisNetOptions:
             args.device = torch.device("cpu")
         else:
             args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            print(" Using GPU in torch")
 
         self.args = args
 
     def print_args(self):
-        print("==========       CONFIG      =============")
+        print("\n" + "="*20 + " AxisNet Configuration " + "="*20)
         for arg, content in self.args.__dict__.items():
-            print("{}:{}".format(arg, content))
-        print("==========     CONFIG END    =============")
-        print("\n")
-        phase = "train" if self.args.train == 1 else "eval"
-        print("===> Phase is {}.".format(phase))
+            if arg not in ['device']: # Skip device object
+                print(f"{arg: <25}: {content}")
+        print("="*63 + "\n")
+        print(f"===> Phase: {self.args.mode.upper()}")
 
     def initialize(self):
         self.set_seed(self.args.seed)

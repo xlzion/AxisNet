@@ -7,19 +7,19 @@ from .axisnet_model import AxisNetFusion
 
 
 class AxisNetTransformer(AxisNetFusion):
-    def __init__(self, input_dim, num_classes, dropout, edgenet_input_dim, edge_dropout, hgc, lg,
+    def __init__(self, input_dim, num_classes, dropout, edgenet_input_dim, edge_dropout, hidden_dim, num_layers,
                  microbiome_dim=2503, contrastive_weight=0.5, n_heads=4):
-        super().__init__(input_dim, num_classes, dropout, edgenet_input_dim, edge_dropout, hgc, lg,
+        super().__init__(input_dim, num_classes, dropout, edgenet_input_dim, edge_dropout, hidden_dim, num_layers,
                          microbiome_dim, contrastive_weight)
 
         self.gconv = nn.ModuleList()
-        hidden = [hgc for _ in range(lg)]
-        for i in range(lg):
+        hidden = [hidden_dim for _ in range(num_layers)]
+        for i in range(num_layers):
             in_channels = input_dim if i == 0 else hidden[i - 1]
             self.gconv.append(
                 tg.nn.TransformerConv(
                     in_channels,
-                    hgc // n_heads,
+                    hidden_dim // n_heads,
                     heads=n_heads,
                     edge_dim=1,
                     dropout=dropout,
@@ -38,7 +38,7 @@ class AxisNetTransformer(AxisNetFusion):
         h = self.relu(self.gconv[0](features, edge_index, edge_attr))
         h0 = h
 
-        for i in range(1, self.lg):
+        for i in range(1, self.num_layers):
             h = F.dropout(h, self.dropout, self.training)
             h = self.relu(self.gconv[i](h, edge_index, edge_attr))
             jk = torch.cat((h0, h), axis=1)
@@ -56,12 +56,12 @@ class AxisNetTransformer(AxisNetFusion):
 
 
 class AxisNetGcnTransformer(AxisNetFusion):
-    def __init__(self, input_dim, num_classes, dropout, edgenet_input_dim, edge_dropout, hgc, lg,
+    def __init__(self, input_dim, num_classes, dropout, edgenet_input_dim, edge_dropout, hidden_dim, num_layers,
                  microbiome_dim=2503, contrastive_weight=0.5, n_heads=4, n_layers=2):
-        super().__init__(input_dim, num_classes, dropout, edgenet_input_dim, edge_dropout, hgc, lg,
+        super().__init__(input_dim, num_classes, dropout, edgenet_input_dim, edge_dropout, hidden_dim, num_layers,
                          microbiome_dim, contrastive_weight)
 
-        cls_input_dim = sum([hgc for _ in range(lg)])
+        cls_input_dim = sum([hidden_dim for _ in range(num_layers)])
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=cls_input_dim,
             nhead=n_heads,
@@ -83,7 +83,7 @@ class AxisNetGcnTransformer(AxisNetFusion):
         h = self.relu(self.gconv[0](features, edge_index, edge_weight))
         h0 = h
 
-        for i in range(1, self.lg):
+        for i in range(1, self.num_layers):
             h = F.dropout(h, self.dropout, self.training)
             h = self.relu(self.gconv[i](h, edge_index, edge_weight))
             jk = torch.cat((h0, h), axis=1)

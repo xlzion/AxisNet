@@ -21,18 +21,18 @@ class MicrobiomeEncoder(nn.Module):
 
 
 class AxisNetFusion(nn.Module):
-    def __init__(self, input_dim, num_classes, dropout, edgenet_input_dim, edge_dropout, hgc, lg,
+    def __init__(self, input_dim, num_classes, dropout, edgenet_input_dim, edge_dropout, hidden_dim, num_layers,
                  microbiome_dim=2503, contrastive_weight=0.5):
         super().__init__()
         k_hops = 3
-        hidden = [hgc for _ in range(lg)]
+        hidden = [hidden_dim for _ in range(num_layers)]
         self.dropout = dropout
         self.edge_dropout = edge_dropout
         self.relu = nn.ReLU(inplace=True)
-        self.lg = lg
+        self.num_layers = num_layers
 
         self.gconv = nn.ModuleList()
-        for i in range(lg):
+        for i in range(num_layers):
             in_channels = input_dim if i == 0 else hidden[i - 1]
             self.gconv.append(tg.nn.ChebConv(in_channels, hidden[i], k_hops, normalization="sym", bias=False))
 
@@ -49,7 +49,7 @@ class AxisNetFusion(nn.Module):
 
         self.microbiome_encoder = MicrobiomeEncoder(microbiome_dim, embed_dim=128)
         self.contrastive_projector = nn.Sequential(
-            nn.Linear(sum([hgc for _ in range(lg)]), 128),
+            nn.Linear(sum([hidden_dim for _ in range(num_layers)]), 128),
             nn.BatchNorm1d(128),
             nn.ReLU(),
             nn.Linear(128, 128),
@@ -93,7 +93,7 @@ class AxisNetFusion(nn.Module):
         h = self.relu(self.gconv[0](features, edge_index, edge_weight))
         h0 = h
 
-        for i in range(1, self.lg):
+        for i in range(1, self.num_layers):
             h = F.dropout(h, self.dropout, self.training)
             h = self.relu(self.gconv[i](h, edge_index, edge_weight))
             jk = torch.cat((h0, h), axis=1)
@@ -167,17 +167,17 @@ class AxisNetFusion(nn.Module):
 
 
 class AxisNetGCN(nn.Module):
-    def __init__(self, input_dim, num_classes, dropout, edgenet_input_dim, edge_dropout, hgc, lg):
+    def __init__(self, input_dim, num_classes, dropout, edgenet_input_dim, edge_dropout, hidden_dim, num_layers):
         super().__init__()
         k_hops = 3
-        hidden = [hgc for _ in range(lg)]
+        hidden = [hidden_dim for _ in range(num_layers)]
         self.dropout = dropout
         self.edge_dropout = edge_dropout
         self.relu = nn.ReLU(inplace=True)
-        self.lg = lg
+        self.num_layers = num_layers
 
         self.gconv = nn.ModuleList()
-        for i in range(lg):
+        for i in range(num_layers):
             in_channels = input_dim if i == 0 else hidden[i - 1]
             self.gconv.append(tg.nn.ChebConv(in_channels, hidden[i], k_hops, normalization="sym", bias=False))
         cls_input_dim = sum(hidden)
@@ -214,7 +214,7 @@ class AxisNetGCN(nn.Module):
         h = self.relu(self.gconv[0](features, edge_index, edge_weight))
         h0 = h
 
-        for i in range(1, self.lg):
+        for i in range(1, self.num_layers):
             h = F.dropout(h, self.dropout, self.training)
             h = self.relu(self.gconv[i](h, edge_index, edge_weight))
             jk = torch.cat((h0, h), axis=1)

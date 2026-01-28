@@ -496,7 +496,7 @@ All commands should be run from the **parent AxisNet directory** (not from insid
 Train AxisNetGCN on fMRI data only:
 
 ```bash
-python -m AxisNet_refactor.scripts.train_eval --train=1
+python -m AxisNet_refactor.scripts.train_eval --mode=train
 ```
 
 ### Multimodal Training
@@ -505,36 +505,36 @@ Enable microbiome integration with AxisNetFusion:
 
 ```bash
 # With simulated microbiome data
-python -m AxisNet_refactor.scripts.train_eval --train=1 --use_multimodal
+python -m AxisNet_refactor.scripts.train_eval --mode=train --use_multimodal
 
 # With real microbiome data (CSV)
-python -m AxisNet_refactor.scripts.train_eval --train=1 --use_multimodal \
+python -m AxisNet_refactor.scripts.train_eval --mode=train --use_multimodal \
     --microbiome_path=/path/to/microbiome.csv
 
 # With BIOM format (bundled sample data)
-python -m AxisNet_refactor.scripts.train_eval --train=1 --use_multimodal \
+python -m AxisNet_refactor.scripts.train_eval --mode=train --use_multimodal \
     --microbiome_path=AxisNet_refactor/data/feature-table.biom
 ```
 
 ### Evaluation
 
 ```bash
-python -m AxisNet_refactor.scripts.train_eval --train=0
+python -m AxisNet_refactor.scripts.train_eval --mode=eval
 ```
 
 ### Using Different Model Architectures
 
 ```bash
 # AxisNetFusion - Enhanced GCN with multimodal (default)
-python -m AxisNet_refactor.scripts.train_eval --train=1 --use_multimodal \
+python -m AxisNet_refactor.scripts.train_eval --mode=train --use_multimodal \
     --model_type=enhanced
 
 # AxisNetTransformer - Transformer-based GNN
-python -m AxisNet_refactor.scripts.train_eval --train=1 --use_multimodal \
+python -m AxisNet_refactor.scripts.train_eval --mode=train --use_multimodal \
     --model_type=transformer
 
 # AxisNetGcnTransformer - GCN + Transformer Encoder (hybrid)
-python -m AxisNet_refactor.scripts.train_eval --train=1 --use_multimodal \
+python -m AxisNet_refactor.scripts.train_eval --mode=train --use_multimodal \
     --model_type=gcn_transformer
 ```
 
@@ -746,7 +746,7 @@ fMRI → ChebConv layers → JK concatenation → Transformer Encoder → Classi
 
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
-| `--train` | int | 1 | 1 for training, 0 for evaluation |
+| `--mode` | str | train | Execution mode: `train` or `eval` |
 | `--use_cpu` | flag | False | Force CPU usage |
 | `--seed` | int | 123 | Random seed for reproducibility |
 | `--ckpt_path` | str | ./save_models/axisnet | Checkpoint save directory |
@@ -756,10 +756,10 @@ fMRI → ChebConv layers → JK concatenation → Transformer Encoder → Classi
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
 | `--model_type` | str | enhanced | Model: `enhanced`, `transformer`, `gcn_transformer` |
-| `--hgc` | int | 16 | Hidden units in graph conv layers |
-| `--lg` | int | 4 | Number of graph conv layers |
+| `--hidden_dim` | int | 16 | Hidden units in graph conv layers |
+| `--num_layers` | int | 4 | Number of graph conv layers |
 | `--dropout` | float | 0.2 | Node feature dropout rate |
-| `--edropout` | float | 0.3 | Edge dropout rate |
+| `--edge_dropout` | float | 0.3 | Edge dropout rate |
 | `--num_classes` | int | 2 | Number of output classes |
 
 ### Training
@@ -767,8 +767,8 @@ fMRI → ChebConv layers → JK concatenation → Transformer Encoder → Classi
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
 | `--lr` | float | 0.01 | Learning rate |
-| `--wd` | float | 5e-5 | Weight decay |
-| `--num_iter` | int | 300 | Number of training epochs |
+| `--weight_decay` | float | 5e-5 | Weight decay |
+| `--epochs` | int | 300 | Maximum number of training epochs |
 
 ### Multimodal
 
@@ -776,12 +776,11 @@ fMRI → ChebConv layers → JK concatenation → Transformer Encoder → Classi
 |----------|------|---------|-------------|
 | `--use_multimodal` | flag | False | Enable microbiome data integration |
 | `--microbiome_path` | str | None | Path to microbiome data file |
-| `--microbiome_dim` | int | 2503 | Raw microbiome feature dimension |
 | `--microbiome_pca_dim` | int | 64 | PCA-reduced dimension |
 | `--microbiome_top_k` | int | 5 | Top-K for pseudo-pairing |
 | `--contrastive_weight` | float | 0.5 | Contrastive loss weight |
-| `--microbiome_reg_weight` | float | 0.05 | Graph consistency loss weight |
-| `--microbiome_warmup_epochs` | int | 10 | Warmup before regularization |
+| `--consistency_weight` | float | 0.05 | Graph consistency loss weight |
+| `--warmup_epochs` | int | 10 | Warmup before regularization |
 | `--drop_age` | flag | False | Exclude age from phenotypes |
 | `--drop_sex` | flag | False | Exclude sex from phenotypes |
 
@@ -789,22 +788,22 @@ fMRI → ChebConv layers → JK concatenation → Transformer Encoder → Classi
 
 **Quick test:**
 ```bash
-python -m AxisNet_refactor.scripts.train_eval --train=1 --use_multimodal \
-    --num_iter=10 --hgc=8 --lg=2
+python -m AxisNet_refactor.scripts.train_eval --mode=train --use_multimodal \
+    --epochs=10 --hidden_dim=8 --num_layers=2
 ```
 
 **High-performance:**
 ```bash
-python -m AxisNet_refactor.scripts.train_eval --train=1 --use_multimodal \
-    --hgc=32 --lg=4 --lr=0.005 --num_iter=500 \
-    --contrastive_weight=0.3 --microbiome_reg_weight=0.1
+python -m AxisNet_refactor.scripts.train_eval --mode=train --use_multimodal \
+    --hidden_dim=32 --num_layers=4 --lr=0.005 --epochs=500 \
+    --contrastive_weight=0.3 --consistency_weight=0.1
 ```
 
 **Transformer-based:**
 ```bash
-python -m AxisNet_refactor.scripts.train_eval --train=1 --use_multimodal \
-    --model_type=transformer --hgc=64 --lg=3 \
-    --dropout=0.3 --edropout=0.4
+python -m AxisNet_refactor.scripts.train_eval --mode=train --use_multimodal \
+    --model_type=transformer --hidden_dim=64 --num_layers=3 \
+    --dropout=0.3 --edge_dropout=0.4
 ```
 
 ---

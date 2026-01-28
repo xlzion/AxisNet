@@ -13,7 +13,7 @@ def build_model(opt, node_ftr_dim, nonimg_dim, microbiome_dim):
     if opt.model_type == "transformer":
         return AxisNetTransformer(
             node_ftr_dim, opt.num_classes, opt.dropout,
-            edge_dropout=opt.edropout, hgc=opt.hgc, lg=opt.lg,
+            edge_dropout=opt.edge_dropout, hidden_dim=opt.hidden_dim, num_layers=opt.num_layers,
             edgenet_input_dim=2 * nonimg_dim,
             microbiome_dim=microbiome_dim,
             contrastive_weight=opt.contrastive_weight,
@@ -21,7 +21,7 @@ def build_model(opt, node_ftr_dim, nonimg_dim, microbiome_dim):
     if opt.model_type == "gcn_transformer":
         return AxisNetGcnTransformer(
             node_ftr_dim, opt.num_classes, opt.dropout,
-            edge_dropout=opt.edropout, hgc=opt.hgc, lg=opt.lg,
+            edge_dropout=opt.edge_dropout, hidden_dim=opt.hidden_dim, num_layers=opt.num_layers,
             edgenet_input_dim=2 * nonimg_dim,
             microbiome_dim=microbiome_dim,
             contrastive_weight=opt.contrastive_weight,
@@ -29,14 +29,14 @@ def build_model(opt, node_ftr_dim, nonimg_dim, microbiome_dim):
     if opt.use_multimodal:
         return AxisNetFusion(
             node_ftr_dim, opt.num_classes, opt.dropout,
-            edge_dropout=opt.edropout, hgc=opt.hgc, lg=opt.lg,
+            edge_dropout=opt.edge_dropout, hidden_dim=opt.hidden_dim, num_layers=opt.num_layers,
             edgenet_input_dim=2 * nonimg_dim,
             microbiome_dim=microbiome_dim,
             contrastive_weight=opt.contrastive_weight,
         ).to(opt.device)
     return AxisNetGCN(
         node_ftr_dim, opt.num_classes, opt.dropout,
-        edge_dropout=opt.edropout, hgc=opt.hgc, lg=opt.lg,
+        edge_dropout=opt.edge_dropout, hidden_dim=opt.hidden_dim, num_layers=opt.num_layers,
         edgenet_input_dim=2 * nonimg_dim,
     ).to(opt.device)
 
@@ -92,7 +92,7 @@ def run_cv(opt):
         model = build_model(opt, node_ftr.shape[1], nonimg.shape[1], microbiome_dim)
 
         loss_fn = torch.nn.CrossEntropyLoss()
-        optimizer = torch.optim.Adam(model.parameters(), lr=opt.lr, weight_decay=opt.wd)
+        optimizer = torch.optim.Adam(model.parameters(), lr=opt.lr, weight_decay=opt.weight_decay)
         features_cuda = torch.tensor(node_ftr, dtype=torch.float32).to(opt.device)
         edge_index = torch.tensor(edge_index, dtype=torch.long).to(opt.device)
         edgenet_input = torch.tensor(edgenet_input, dtype=torch.float32).to(opt.device)
@@ -110,7 +110,7 @@ def run_cv(opt):
             print("  Number of training samples %d" % len(train_ind))
             print("  Start training...\r\n")
             acc = 0
-            for epoch in range(opt.num_iter):
+            for epoch in range(opt.epochs):
                 model.train()
                 optimizer.zero_grad()
 
@@ -123,7 +123,7 @@ def run_cv(opt):
                         contrastive_loss = model.contrastive_loss(
                             microbiome_embed[train_ind], brain_embed[train_ind], labels[train_ind]
                         )
-                        reg_weight = opt.microbiome_reg_weight if epoch >= opt.microbiome_warmup_epochs else 0.0
+                        reg_weight = opt.consistency_weight if epoch >= opt.warmup_epochs else 0.0
                         reg_loss = model.graph_consistency_loss(
                             getattr(model, "edge_index_used", edge_index), edge_weights, fold_microbiome
                         )
@@ -180,9 +180,9 @@ def run_cv(opt):
             prfs[fold] = prf(logits_test, y[test_ind])
             print("  Fold {} test accuracy {:.5f}, AUC {:.5f}".format(fold, accs[fold], aucs[fold]))
 
-        if opt.train == 1:
+        if opt.mode == 'train':
             train()
-        elif opt.train == 0:
+        elif opt.mode == 'eval':
             evaluate()
 
     print("\r\n========================== Finish ==========================")
