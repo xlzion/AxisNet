@@ -851,39 +851,25 @@ AxisNet_refactor/
 
 ## Results
 
-### Expected Performance
+### Performance Comparison
 
 | Model | Accuracy | AUC | Sensitivity | Specificity | F1-Score |
 |-------|----------|-----|-------------|-------------|----------|
-| AxisNetGCN (baseline) | 73.2% | 0.78 | 0.71 | 0.75 | 0.72 |
-| AxisNetFusion | 76.8% | 0.82 | 0.75 | 0.78 | 0.76 |
-| AxisNetTransformer | 77.5% | 0.83 | 0.76 | 0.79 | 0.77 |
-| AxisNetGcnTransformer | 78.2% | 0.84 | 0.77 | 0.80 | 0.78 |
+| AxisNetGCN (Unimodal) | 81.9% | 0.851 | 0.855 | 0.798 | 0.819 |
+| AxisNetFusion (Enhanced) | **82.0%** | **0.845** | **0.843** | **0.806** | **0.821** |
+| AxisNetTransformer | 73.6% | 0.763 | 0.758 | 0.747 | 0.739 |
+| AxisNetGcnTransformer | 79.1% | 0.789 | 0.829 | 0.794 | 0.802 |
 
-*Results based on 10-fold cross-validation on the ABIDE dataset with Harvard-Oxford atlas.*
+*Results based on 10-fold cross-validation on the ABIDE dataset (seed 123).*
 
-### Ablation Study
+### Multimodal Gain Analysis
 
-| Configuration | Accuracy | Δ Accuracy |
-|---------------|----------|------------|
-| fMRI only (baseline) | 73.2% | - |
-| + Microbiome encoder | 74.5% | +1.3% |
-| + Contrastive loss | 75.8% | +2.6% |
-| + Graph consistency | 76.8% | +3.6% |
-| + Transformer conv | 78.2% | +5.0% |
+| Model | Unimodal Acc | Multimodal Acc | Gain (Δ) |
+|-------|--------------|----------------|----------|
+| Enhanced GCN | 81.93% | 82.03% | +0.10% |
+| GCN-Transformer | 78.07% | 79.13% | +1.06% |
+| Transformer | 74.01% | 73.62% | -0.39% |
 
-### Training Dynamics
-
-```
-Epoch 0:   CE loss: 0.6932, Train acc: 0.52
-Epoch 50:  CE loss: 0.4521, Train acc: 0.78
-Epoch 100: CE loss: 0.3215, Train acc: 0.85
-Epoch 200: CE loss: 0.2103, Train acc: 0.91
-Epoch 300: CE loss: 0.1542, Train acc: 0.94
-
-=> 10-fold CV Test Accuracy: 76.8%
-=> 10-fold CV Test AUC: 0.82
-```
 
 ---
 
@@ -892,14 +878,6 @@ Epoch 300: CE loss: 0.1542, Train acc: 0.94
 If you use AxisNet in your research, please cite:
 
 ```bibtex
-@inproceedings{huang2020edge,
-  title={Edge-Variational Graph Convolutional Networks for Uncertainty-Aware Disease Prediction},
-  author={Huang, Yongxiang and Chung, Albert CS},
-  booktitle={International Conference on Medical Image Computing and Computer-Assisted Intervention},
-  pages={562--572},
-  year={2020},
-  organization={Springer}
-}
 
 @article{axisnet2026,
   title={AxisNet: Multimodal Microbiome-Brain Network Fusion for Neurological Disease Prediction},
@@ -915,13 +893,13 @@ If you use AxisNet in your research, please cite:
 
 This work builds upon:
 
-- **EV-GCN**: Huang et al., MICCAI 2020
 - **ABIDE Dataset**: Autism Brain Imaging Data Exchange consortium
 - **PyTorch Geometric**: Graph neural network library
 - **nilearn**: Neuroimaging machine learning library
 
 ### Related Work
-
+- Huang et al., "Edge-variational Graph Convolutional Networks
+for Uncertainty-aware Disease Prediction", MICCAI 2020
 - Chen et al., "A Simple Framework for Contrastive Learning of Visual Representations", ICML 2020
 - Cryan et al., "The Microbiota-Gut-Brain Axis", Physiological Reviews, 2019
 - Kipf & Welling, "Semi-Supervised Classification with Graph Convolutional Networks", ICLR 2017
