@@ -1,1 +1,1 @@
-"""AxisNet refactor package."""
+"""AxisNet init."""
