@@ -14,29 +14,29 @@ class AxisNetMicrobiomeLoader:
     def load_multimodal(self, connectivity="correlation", atlas="ho", microbiome_path=None,
                         similarity_threshold=0.8, top_k=5, microbiome_pca_dim=64,
                         drop_age=False, drop_sex=False):
-        print("  加载fMRI数据...")
+        print("  Loading fMRI data...")
         fmri_data, labels, clinical_data = self.base.load_data(
             connectivity, atlas, drop_age=drop_age, drop_sex=drop_sex
         )
         n_fmri = len(fmri_data)
-        print(f"  fMRI样本数: {n_fmri}")
+        print(f"  fMRI sample count: {n_fmri}")
 
         if microbiome_path is not None:
-            print("  加载微生物组数据...")
+            print("  Loading microbiome data...")
             microbiome_meta, microbiome_raw = self._load_microbiome_data(microbiome_path)
-            print(f"  微生物组样本数: {len(microbiome_meta) if microbiome_meta is not None else 0}")
+            print(f"  Microbiome sample count: {len(microbiome_meta) if microbiome_meta is not None else 0}")
         else:
             microbiome_meta, microbiome_raw = None, None
 
         if microbiome_meta is not None:
-            print("  创建增强微生物组特征...")
+            print("  Creating enhanced microbiome features...")
             microbiome_features = self._create_microbiome_features(
                 fmri_data, labels, clinical_data, microbiome_meta, microbiome_raw,
                 similarity_threshold, top_k, microbiome_pca_dim,
                 drop_age=drop_age, drop_sex=drop_sex
             )
         else:
-            print("  生成模拟微生物组特征...")
+            print("  Generating simulated microbiome features...")
             microbiome_features = self._create_simulated_microbiome_features(n_fmri, microbiome_pca_dim)
 
         return fmri_data, labels, clinical_data, microbiome_features
@@ -79,7 +79,7 @@ class AxisNetMicrobiomeLoader:
             )
             return microbiome_meta, microbiome_raw
         except Exception as e:
-            print(f"加载微生物组数据失败: {e}")
+            print(f"Loading microbiome data failed: {e}")
             return None, None
 
     def _find_meta_path(self, microbiome_path):
@@ -100,7 +100,7 @@ class AxisNetMicrobiomeLoader:
             features = table.matrix_data.T.toarray().astype(np.float32)
             return features, sample_ids
         except Exception as e:
-            print(f"BIOM加载失败: {e}")
+            print(f"BIOM loading failed: {e}")
             return None, None
 
     def _load_hdf5_features(self, h5_path):
@@ -137,7 +137,7 @@ class AxisNetMicrobiomeLoader:
 
         micro_features = self._prepare_microbiome_features(microbiome_raw, microbiome_pca_dim, n_microbiome)
         if micro_features is None:
-            print("  未提供真实微生物组特征，使用模拟特征用于图正则化。")
+            print("  No real microbiome features were provided, and simulated features were used for graph regularization.")
             micro_features = self._generate_mock_microbiome_data(n_microbiome, n_features=microbiome_pca_dim)
 
         enhanced_features = np.zeros((n_fmri, micro_features.shape[1]), dtype=np.float32)
@@ -189,7 +189,7 @@ class AxisNetMicrobiomeLoader:
         return pca.fit_transform(clr).astype(np.float32)
 
     def _create_simulated_microbiome_features(self, n_fmri, feature_dim):
-        print(f"  生成模拟微生物组特征: {n_fmri}样本 × {feature_dim}特征")
+        print(f"  Generating simulated microbiome features: {n_fmri} samples × {feature_dim} features")
         features = np.random.randn(n_fmri, feature_dim).astype(np.float32)
         for i in range(n_fmri):
             base_pattern = np.sin(np.linspace(0, 4 * np.pi, feature_dim)) * 0.5
