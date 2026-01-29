@@ -385,7 +385,7 @@ def graph_consistency_loss(edge_index, edge_weight, microbiome_features):
 ```bash
 # Clone the repository
 git clone https://github.com/your-username/AxisNet.git
-cd AxisNet/AxisNet_refactor
+cd AxisNet
 
 # Create virtual environment (optional but recommended)
 conda create -n axisnet python=3.8
@@ -481,7 +481,7 @@ sub-002,10.2,2,2
 If you don't have real microbiome data, AxisNet can generate realistic simulated data:
 
 ```bash
-python -m AxisNet_refactor.scripts.train_eval --train=1 --use_multimodal
+python -m scripts.train_eval --train=1 --use_multimodal
 # Simulated microbiome data will be automatically generated
 ```
 
@@ -489,14 +489,14 @@ python -m AxisNet_refactor.scripts.train_eval --train=1 --use_multimodal
 
 ## Usage
 
-All commands should be run from the **parent AxisNet directory** (not from inside `AxisNet_refactor/`).
+All commands should be run from the **AxisNet directory** .
 
 ### Basic Training (Single Modality)
 
 Train AxisNetGCN on fMRI data only:
 
 ```bash
-python -m AxisNet_refactor.scripts.train_eval --mode=train
+python scripts.train_eval --mode=train
 ```
 
 ### Multimodal Training
@@ -505,36 +505,36 @@ Enable microbiome integration with AxisNetFusion:
 
 ```bash
 # With simulated microbiome data
-python -m AxisNet_refactor.scripts.train_eval --mode=train --use_multimodal
+python scripts.train_eval --mode=train --use_multimodal
 
 # With real microbiome data (CSV)
-python -m AxisNet_refactor.scripts.train_eval --mode=train --use_multimodal \
-    --microbiome_path=/path/to/microbiome.csv
+python scripts.train_eval --mode=train --use_multimodal 
+
 
 # With BIOM format (bundled sample data)
-python -m AxisNet_refactor.scripts.train_eval --mode=train --use_multimodal \
-    --microbiome_path=AxisNet_refactor/data/feature-table.biom
+python scripts.train_eval --mode=train --use_multimodal 
+
 ```
 
 ### Evaluation
 
 ```bash
-python -m AxisNet_refactor.scripts.train_eval --mode=eval
+python scripts.train_eval --mode=eval
 ```
 
 ### Using Different Model Architectures
 
 ```bash
 # AxisNetFusion - Enhanced GCN with multimodal (default)
-python -m AxisNet_refactor.scripts.train_eval --mode=train --use_multimodal \
+python scripts.train_eval --mode=train --use_multimodal \
     --model_type=enhanced
 
 # AxisNetTransformer - Transformer-based GNN
-python -m AxisNet_refactor.scripts.train_eval --mode=train --use_multimodal \
+python  scripts.train_eval --mode=train --use_multimodal \
     --model_type=transformer
 
 # AxisNetGcnTransformer - GCN + Transformer Encoder (hybrid)
-python -m AxisNet_refactor.scripts.train_eval --mode=train --use_multimodal \
+python scripts.train_eval --mode=train --use_multimodal \
     --model_type=gcn_transformer
 ```
 
@@ -544,13 +544,13 @@ Run systematic experiments across multiple seeds and configurations:
 
 ```bash
 # Default experiment suite (seeds: 0-4 and 42, 123, 2020-2022)
-python -m AxisNet_refactor.scripts.run_experiments \
-    --microbiome_path=AxisNet_refactor/data/feature-table.biom \
+python scripts.run_experiments \
+    --microbiome_path=data/feature-table.biom \
     --out_csv=experiment_results.csv
 
 # Custom seeds
-python -m AxisNet_refactor.scripts.run_experiments \
-    --microbiome_path=AxisNet_refactor/data/feature-table.biom \
+python scripts.run_experiments \
+    --microbiome_path=data/feature-table.biom \
     --seeds=42,123,456 \
     --out_csv=custom_results.csv
 ```
@@ -565,9 +565,9 @@ The batch runner automatically tests:
 ```python
 import torch
 import torch.nn.functional as F
-from AxisNet_refactor.data.loader import AxisNetDataLoader
-from AxisNet_refactor.data.multimodal_loader import AxisNetMicrobiomeLoader
-from AxisNet_refactor.core.axisnet_model import AxisNetFusion
+from data.loader import AxisNetDataLoader
+from data.multimodal_loader import AxisNetMicrobiomeLoader
+from core.axisnet_model import AxisNetFusion
 
 # Initialize data loader
 dl = AxisNetDataLoader()
@@ -615,14 +615,14 @@ total_loss = classification_loss + 0.5 * contrastive_loss + 0.05 * consistency_l
 ### Full Training Example
 
 ```python
-from AxisNet_refactor.config.opt import AxisNetOptions
-from AxisNet_refactor.scripts.train_eval import run_cv
+from config.opt import AxisNetOptions
+from scripts.train_eval import run_cv
 
 # Configure and run
 argv = [
     '--train=1',
     '--use_multimodal',
-    '--microbiome_path=AxisNet_refactor/data/feature-table.biom',
+    '--microbiome_path=data/feature-table.biom',
     '--model_type=enhanced',
     '--num_iter=100',
     '--seed=42'
@@ -643,7 +643,7 @@ print(f"AUC: {results['auc_mean']:.4f} ± {results['auc_std']:.4f}")
 The baseline GCN for single-modality fMRI classification.
 
 ```python
-from AxisNet_refactor.core.axisnet_model import AxisNetGCN
+from core.axisnet_model import AxisNetGCN
 
 model = AxisNetGCN(
     input_dim=2000,
@@ -661,7 +661,7 @@ model = AxisNetGCN(
 Extended GCN with microbiome integration and contrastive learning.
 
 ```python
-from AxisNet_refactor.core.axisnet_model import AxisNetFusion
+from core.axisnet_model import AxisNetFusion
 
 model = AxisNetFusion(
     input_dim=2000,
@@ -681,7 +681,7 @@ model = AxisNetFusion(
 Replaces Chebyshev convolutions with Transformer-based graph convolutions:
 
 ```python
-from AxisNet_refactor.core.transformer_gcn import AxisNetTransformer
+from core.transformer_gcn import AxisNetTransformer
 
 model = AxisNetTransformer(
     input_dim=2000,
@@ -707,7 +707,7 @@ model = AxisNetTransformer(
 Combines GCN layers with a Transformer encoder:
 
 ```python
-from AxisNet_refactor.core.transformer_gcn import AxisNetGcnTransformer
+from core.transformer_gcn import AxisNetGcnTransformer
 
 model = AxisNetGcnTransformer(
     input_dim=2000,
@@ -788,20 +788,20 @@ fMRI → ChebConv layers → JK concatenation → Transformer Encoder → Classi
 
 **Quick test:**
 ```bash
-python -m AxisNet_refactor.scripts.train_eval --mode=train --use_multimodal \
+python scripts.train_eval --mode=train --use_multimodal \
     --epochs=10 --hidden_dim=8 --num_layers=2
 ```
 
 **High-performance:**
 ```bash
-python -m AxisNet_refactor.scripts.train_eval --mode=train --use_multimodal \
+python scripts.train_eval --mode=train --use_multimodal \
     --hidden_dim=32 --num_layers=4 --lr=0.005 --epochs=500 \
     --contrastive_weight=0.3 --consistency_weight=0.1
 ```
 
 **Transformer-based:**
 ```bash
-python -m AxisNet_refactor.scripts.train_eval --mode=train --use_multimodal \
+python scripts.train_eval --mode=train --use_multimodal \
     --model_type=transformer --hidden_dim=64 --num_layers=3 \
     --dropout=0.3 --edge_dropout=0.4
 ```
@@ -811,7 +811,7 @@ python -m AxisNet_refactor.scripts.train_eval --mode=train --use_multimodal \
 ## Project Structure
 
 ```
-AxisNet_refactor/
+AxisNet/
 ├── __init__.py
 ├── README.md
 │
