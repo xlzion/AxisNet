@@ -16,7 +16,7 @@
 - [Installation](#installation)
 - [Data Preparation](#data-preparation)
 - [Usage](#usage)
-- [Model Variants](#model-variants)
+- [Model (GCN+Transformer)](#model-axisnetgcntransformer-gcntransformer)
 - [Configuration Options](#configuration-options)
 - [Project Structure](#project-structure)
 - [Results](#results)
@@ -32,7 +32,7 @@
 - **Microbiome modality integration** via a dedicated encoder
 - **Cross-modal contrastive learning** for modality alignment
 - **Graph consistency regularization** leveraging microbiome similarities
-- **Multiple GNN backbone options** (Chebyshev, Transformer-based)
+- **GCN+Transformer hybrid** (ChebConv layers + Transformer encoder)
 
 ### Key Features
 
@@ -41,7 +41,7 @@
 | **Multimodal Fusion** | Integrates fMRI brain connectivity with gut microbiome data |
 | **Edge-Variational Learning** | Learns adaptive edge weights via Pairwise Affinity Estimator (PAE) |
 | **Contrastive Learning** | Label-aware cross-modal alignment using NT-Xent loss |
-| **Flexible Architecture** | Supports ChebConv, TransformerConv, and hybrid GNN+Transformer |
+| **GCN+Transformer** | ChebConv layers with JK + Transformer encoder for graph and modality fusion |
 | **Intelligent Data Pairing** | Smart pseudo-pairing when direct sample correspondence is unavailable |
 | **Backward Compatible** | Fully supports single-modality (fMRI-only) training |
 
@@ -481,7 +481,7 @@ sub-002,10.2,2,2
 If you don't have real microbiome data, AxisNet can generate realistic simulated data:
 
 ```bash
-python -m scripts.train_eval --train=1 --use_multimodal
+python -m scripts.train_eval --train=1 --use_multimodal --model_type=gcn_transformer
 # Simulated microbiome data will be automatically generated
 ```
 
@@ -493,72 +493,73 @@ All commands should be run from the **AxisNet directory** .
 
 ### Basic Training (Single Modality)
 
-Train AxisNetGCN on fMRI data only:
+Train GCN+Transformer on fMRI data only (no microbiome):
 
 ```bash
-python scripts.train_eval --mode=train
+python scripts.train_eval --mode=train --model_type=gcn_transformer
 ```
 
-### Multimodal Training
+### Multimodal Training (GCN+Transformer)
 
-Enable microbiome integration with AxisNetFusion:
+Train AxisNetGcnTransformer (GCN + Transformer encoder) with microbiome integration:
 
 ```bash
 # With simulated microbiome data
-python scripts.train_eval --mode=train --use_multimodal
+python scripts.train_eval --mode=train --use_multimodal --model_type=gcn_transformer
 
 # With real microbiome data (CSV)
-python scripts.train_eval --mode=train --use_multimodal 
-
+python scripts.train_eval --mode=train --use_multimodal --model_type=gcn_transformer
 
 # With BIOM format (bundled sample data)
-python scripts.train_eval --mode=train --use_multimodal 
-
+python scripts.train_eval --mode=train --use_multimodal --model_type=gcn_transformer
 ```
 
 ### Evaluation
 
 ```bash
-python scripts.train_eval --mode=eval
-```
-
-### Using Different Model Architectures
-
-```bash
-# AxisNetFusion - Enhanced GCN with multimodal (default)
-python scripts.train_eval --mode=train --use_multimodal \
-    --model_type=enhanced
-
-# AxisNetTransformer - Transformer-based GNN
-python  scripts.train_eval --mode=train --use_multimodal \
-    --model_type=transformer
-
-# AxisNetGcnTransformer - GCN + Transformer Encoder (hybrid)
-python scripts.train_eval --mode=train --use_multimodal \
-    --model_type=gcn_transformer
+python scripts.train_eval --mode=eval --model_type=gcn_transformer
 ```
 
 ### Batch Experiments
 
-Run systematic experiments across multiple seeds and configurations:
+Run GCN+Transformer ablation (unimodal vs multimodal, phenotype variants):
 
 ```bash
-# Default experiment suite (seeds: 0-4 and 42, 123, 2020-2022)
 python scripts.run_experiments \
     --microbiome_path=data/feature-table.biom \
-    --out_csv=experiment_results.csv
-
-# Custom seeds
-python scripts.run_experiments \
-    --microbiome_path=data/feature-table.biom \
-    --seeds=42,123,456 \
-    --out_csv=custom_results.csv
+    --model_type=gcn_transformer \
+    --out_csv=result0_gcn_transformer.csv
 ```
 
-The batch runner automatically tests:
-- All 3 model types: `enhanced`, `transformer`, `gcn_transformer`
+The batch runner tests:
 - Unimodal vs multimodal
 - 4 phenotype variants: full, drop_age, drop_sex, drop_age_sex
+
+### ABIDE II: Cross-Validation and LOSO
+
+To run on **ABIDE II** with configurable data paths and CV strategy:
+
+**10-fold stratified cross-validation (default):**
+```bash
+python scripts/run_abide2_cv.py \
+  --data_folder /path/to/ABIDE_II/cpac/filt_noglobal \
+  --phenotype_path /path/to/ABIDE_II_phenotype.csv
+```
+
+**Leave-One-Site-Out (LOSO):** one site as test each fold, rest as train.
+```bash
+python scripts/run_abide2_cv.py \
+  --data_folder /path/to/ABIDE_II/cpac/filt_noglobal \
+  --phenotype_path /path/to/ABIDE_II_phenotype.csv \
+  --cv_type loso
+```
+
+Phenotype CSV should include: `SUB_ID`, `FILE_ID`, `SITE_ID`, `DX_GROUP`, `AGE_AT_SCAN`, `SEX`. Optional: `--subject_ids_path` if subject list is not at `<data_folder>/subject_IDs.txt`. Add `--use_multimodal` and `--microbiome_path` for multimodal runs.
+
+Using the main entrypoint with the same options (ABIDE I or II):
+```bash
+python scripts.train_eval --train=1 --data_folder /path/to/ABIDE_II/... --phenotype_path /path/to/pheno.csv --cv_type loso
+```
 
 ### Programmatic Usage
 
@@ -567,22 +568,22 @@ import torch
 import torch.nn.functional as F
 from data.loader import AxisNetDataLoader
 from data.multimodal_loader import AxisNetMicrobiomeLoader
-from core.axisnet_model import AxisNetFusion
+from core.transformer_gcn import AxisNetGcnTransformer
 
 # Initialize data loader
 dl = AxisNetDataLoader()
-enhanced_dl = AxisNetMicrobiomeLoader(dl)
+mm_loader = AxisNetMicrobiomeLoader(dl)
 
 # Load multimodal data
 fmri_data, labels, clinical_data, microbiome_features = \
-    enhanced_dl.load_multimodal(
+    mm_loader.load_multimodal(
         microbiome_path='path/to/microbiome.csv',
         top_k=5,
         microbiome_pca_dim=64
     )
 
-# Initialize model
-model = AxisNetFusion(
+# Initialize GCN+Transformer model
+model = AxisNetGcnTransformer(
     input_dim=2000,
     num_classes=2,
     dropout=0.2,
@@ -591,7 +592,9 @@ model = AxisNetFusion(
     hgc=16,
     lg=4,
     microbiome_dim=64,
-    contrastive_weight=0.5
+    contrastive_weight=0.5,
+    n_heads=4,
+    n_layers=2
 )
 
 # Forward pass
@@ -618,12 +621,12 @@ total_loss = classification_loss + 0.5 * contrastive_loss + 0.05 * consistency_l
 from config.opt import AxisNetOptions
 from scripts.train_eval import run_cv
 
-# Configure and run
+# Configure and run (GCN+Transformer)
 argv = [
     '--train=1',
     '--use_multimodal',
     '--microbiome_path=data/feature-table.biom',
-    '--model_type=enhanced',
+    '--model_type=gcn_transformer',
     '--num_iter=100',
     '--seed=42'
 ]
@@ -636,75 +639,17 @@ print(f"AUC: {results['auc_mean']:.4f} ± {results['auc_std']:.4f}")
 
 ---
 
-## Model Variants
+## Model: AxisNetGcnTransformer (GCN+Transformer)
 
-### 1. AxisNetGCN (Single Modality)
+AxisNet uses the **GCN+Transformer** hybrid: ChebConv layers with Jumping Knowledge (JK) followed by a Transformer encoder, plus microbiome fusion and contrastive learning.
 
-The baseline GCN for single-modality fMRI classification.
+### Architecture
 
-```python
-from core.axisnet_model import AxisNetGCN
-
-model = AxisNetGCN(
-    input_dim=2000,
-    num_classes=2,
-    dropout=0.2,
-    edgenet_input_dim=6,
-    edge_dropout=0.3,
-    hgc=16,
-    lg=4
-)
+```
+fMRI → ChebConv layers → JK concatenation → Transformer Encoder → Multimodal Fusion → Classifier
 ```
 
-### 2. AxisNetFusion (Multimodal)
-
-Extended GCN with microbiome integration and contrastive learning.
-
-```python
-from core.axisnet_model import AxisNetFusion
-
-model = AxisNetFusion(
-    input_dim=2000,
-    num_classes=2,
-    dropout=0.2,
-    edgenet_input_dim=6,
-    edge_dropout=0.3,
-    hgc=16,
-    lg=4,
-    microbiome_dim=64,
-    contrastive_weight=0.5
-)
-```
-
-### 3. AxisNetTransformer
-
-Replaces Chebyshev convolutions with Transformer-based graph convolutions:
-
-```python
-from core.transformer_gcn import AxisNetTransformer
-
-model = AxisNetTransformer(
-    input_dim=2000,
-    num_classes=2,
-    dropout=0.2,
-    edgenet_input_dim=6,
-    edge_dropout=0.3,
-    hgc=16,
-    lg=4,
-    microbiome_dim=64,
-    contrastive_weight=0.5,
-    n_heads=4  # Multi-head attention
-)
-```
-
-**Key differences:**
-- Uses `TransformerConv` instead of `ChebConv`
-- Multi-head self-attention for neighborhood aggregation
-- Edge attributes incorporated into attention computation
-
-### 4. AxisNetGcnTransformer (Hybrid)
-
-Combines GCN layers with a Transformer encoder:
+### Usage
 
 ```python
 from core.transformer_gcn import AxisNetGcnTransformer
@@ -724,19 +669,11 @@ model = AxisNetGcnTransformer(
 )
 ```
 
-**Architecture:**
-```
-fMRI → ChebConv layers → JK concatenation → Transformer Encoder → Classifier
-```
-
-### Comparison
-
-| Model | Graph Conv | Attention | Multimodal | Parameters |
-|-------|-----------|-----------|------------|------------|
-| AxisNetGCN | ChebConv | No | No | ~50K |
-| AxisNetFusion | ChebConv | No | Yes | ~65K |
-| AxisNetTransformer | TransformerConv | Yes | Yes | ~80K |
-| AxisNetGcnTransformer | ChebConv + Transformer | Yes | Yes | ~100K |
+**Key properties:**
+- **Graph Conv**: ChebConv for multi-scale aggregation
+- **Attention**: Transformer encoder on JK features
+- **Multimodal**: Microbiome encoder + contrastive loss
+- **Parameters**: ~100K
 
 ---
 
@@ -755,7 +692,7 @@ fMRI → ChebConv layers → JK concatenation → Transformer Encoder → Classi
 
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
-| `--model_type` | str | enhanced | Model: `enhanced`, `transformer`, `gcn_transformer` |
+| `--model_type` | str | gcn_transformer | Model: `gcn_transformer` (GCN+Transformer) |
 | `--hidden_dim` | int | 16 | Hidden units in graph conv layers |
 | `--num_layers` | int | 4 | Number of graph conv layers |
 | `--dropout` | float | 0.2 | Node feature dropout rate |
@@ -786,24 +723,17 @@ fMRI → ChebConv layers → JK concatenation → Transformer Encoder → Classi
 
 ### Example Configurations
 
-**Quick test:**
+**Quick test (GCN+Transformer):**
 ```bash
-python scripts.train_eval --mode=train --use_multimodal \
+python scripts.train_eval --mode=train --use_multimodal --model_type=gcn_transformer \
     --epochs=10 --hidden_dim=8 --num_layers=2
 ```
 
-**High-performance:**
+**Full training (GCN+Transformer):**
 ```bash
-python scripts.train_eval --mode=train --use_multimodal \
+python scripts.train_eval --mode=train --use_multimodal --model_type=gcn_transformer \
     --hidden_dim=32 --num_layers=4 --lr=0.005 --epochs=500 \
     --contrastive_weight=0.3 --consistency_weight=0.1
-```
-
-**Transformer-based:**
-```bash
-python scripts.train_eval --mode=train --use_multimodal \
-    --model_type=transformer --hidden_dim=64 --num_layers=3 \
-    --dropout=0.3 --edge_dropout=0.4
 ```
 
 ---
@@ -821,9 +751,9 @@ AxisNet/
 │
 ├── core/
 │   ├── __init__.py
-│   ├── axisnet_model.py        # AxisNetGCN, AxisNetFusion
+│   ├── axisnet_model.py        # AxisNetGCN (baseline)
 │   ├── edge_encoder.py         # EdgeEncoder (PAE equivalent)
-│   └── transformer_gcn.py      # AxisNetTransformer, AxisNetGcnTransformer
+│   └── transformer_gcn.py      # AxisNetGcnTransformer (GCN+Transformer)
 │
 ├── data/
 │   ├── __init__.py
@@ -850,24 +780,20 @@ AxisNet/
 
 ## Results
 
-### Performance Comparison
+### AxisNetGcnTransformer (GCN+Transformer) Ablation (seed 123)
 
-| Model | Accuracy | AUC | Sensitivity | Specificity | F1-Score |
-|-------|----------|-----|-------------|-------------|----------|
-| AxisNetGCN (Unimodal) | 81.9% | 0.851 | 0.855 | 0.798 | 0.819 |
-| AxisNetFusion (Enhanced) | **82.0%** | **0.845** | **0.843** | **0.806** | **0.821** |
-| AxisNetTransformer | 73.6% | 0.763 | 0.758 | 0.747 | 0.739 |
-| AxisNetGcnTransformer | 79.1% | 0.789 | 0.829 | 0.794 | 0.802 |
+From `result0_gcn_transformer.csv`. 10-fold cross-validation on the ABIDE dataset. 
 
-*Results based on 10-fold cross-validation on the ABIDE dataset (seed 123).*
-
-### Multimodal Gain Analysis
-
-| Model | Unimodal Acc | Multimodal Acc | Gain (Δ) |
-|-------|--------------|----------------|----------|
-| Enhanced GCN | 81.93% | 82.03% | +0.10% |
-| GCN-Transformer | 78.07% | 79.13% | +1.06% |
-| Transformer | 74.01% | 73.62% | -0.39% |
+| Variant      | Modality   | Accuracy (mean ± std) | AUC (mean ± std) | Sensitivity | Specificity | F1-Score |
+|-------------|------------|------------------------|------------------|-------------|-------------|----------|
+| full        | multimodal | 79.3% ± 13.3%         | 0.821 ± 0.149    | 0.834 ± 0.153 | 0.792 ± 0.119 | 0.803 ± 0.110 |
+| full        | unimodal   | 77.6% ± 13.1%         | 0.784 ± 0.150    | 0.814 ± 0.164 | 0.757 ± 0.099 | 0.780 ± 0.122 |
+| drop_age    | multimodal | 81.7% ± 10.5%         | 0.824 ± 0.108    | 0.868 ± 0.120 | 0.770 ± 0.109 | 0.812 ± 0.104 |
+| drop_age    | unimodal   | 77.4% ± 13.7%         | 0.749 ± 0.208    | 0.807 ± 0.171 | 0.813 ± 0.124 | 0.794 ± 0.106 |
+| drop_sex    | multimodal | 78.7% ± 17.0%         | 0.786 ± 0.182    | 0.771 ± 0.291 | 0.702 ± 0.290 | 0.730 ± 0.288 |
+| drop_sex    | unimodal   | 78.6% ± 15.7%         | 0.761 ± 0.209    | 0.817 ± 0.172 | 0.806 ± 0.141 | 0.801 ± 0.135 |
+| drop_age_sex| multimodal | 82.0% ± 12.3%         | 0.846 ± 0.133    | 0.866 ± 0.131 | 0.775 ± 0.126 | 0.816 ± 0.121 |
+| drop_age_sex| unimodal   | 79.6% ± 15.2%         | 0.789 ± 0.175    | 0.833 ± 0.154 | 0.770 ± 0.155 | 0.795 ± 0.147 |
 
 
 ---

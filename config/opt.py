@@ -16,11 +16,25 @@ class AxisNetOptions:
         mode_group.add_argument("--seed", type=int, default=123, help="Random seed for reproducibility")
         mode_group.add_argument("--use_cpu", action="store_true", help="Force CPU usage even if GPU is available")
 
+        # --- Dataset (ABIDE I / ABIDE II) ---
+        data_group = parser.add_argument_group("Dataset Paths")
+        data_group.add_argument("--data_folder", type=str, default=None,
+                                help="Root folder for connectivity data (e.g. ABIDE_pcp/cpac/filt_noglobal or ABIDE II path)")
+        data_group.add_argument("--phenotype_path", type=str, default=None,
+                                help="Path to phenotype CSV (SUB_ID, FILE_ID, SITE_ID, DX_GROUP, AGE_AT_SCAN, SEX)")
+        data_group.add_argument("--subject_ids_path", type=str, default=None,
+                                help="Path to subject IDs file (one ID per line). Default: <data_folder>/subject_IDs.txt")
+        data_group.add_argument("--cv_type", type=str, default="stratified_kfold",
+                                choices=["stratified_kfold", "loso"],
+                                help="CV strategy: stratified_kfold or loso (Leave-One-Site-Out)")
+        data_group.add_argument("--n_folds", type=int, default=10,
+                                help="Number of folds for stratified_kfold (ignored for loso)")
+
         # --- Model Architecture ---
         arch_group = parser.add_argument_group("Model Architecture")
-        arch_group.add_argument("--model_type", type=str, default="enhanced",
-                                choices=["enhanced", "transformer", "gcn_transformer"],
-                                help="Architecture variant to use")
+        arch_group.add_argument("--model_type", type=str, default="gcn_transformer",
+                                choices=["gcn_transformer"],
+                                help="Model: GCN+Transformer")
         arch_group.add_argument("--hidden_dim", type=int, default=16, help="Hidden units in graph convolution layers")
         arch_group.add_argument("--num_layers", type=int, default=4, help="Number of graph convolution layers")
         arch_group.add_argument("--dropout", default=0.2, type=float, help="Node feature dropout rate")

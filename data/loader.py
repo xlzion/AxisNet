@@ -6,12 +6,16 @@ from ..utils.gcn_utils import preprocess_features
 
 
 class AxisNetDataLoader:
-    def __init__(self):
+    def __init__(self, data_folder=None, phenotype_path=None, subject_ids_path=None):
         self.pd_dict = {}
         self.node_ftr_dim = 2000
         self.num_classes = 2
+        self.data_folder = data_folder
+        self.phenotype_path = phenotype_path
+        self.subject_ids_path = subject_ids_path
 
     def load_data(self, connectivity="correlation", atlas="ho", drop_age=False, drop_sex=False):
+        Reader.set_data_paths(self.data_folder, self.phenotype_path, self.subject_ids_path)
         subject_IDs = Reader.get_ids()
         labels = Reader.get_subject_score(subject_IDs, score="DX_GROUP")
         num_nodes = len(subject_IDs)
@@ -89,8 +93,21 @@ class AxisNetDataLoader:
         return data
 
     def data_split(self, n_folds):
-        skf = StratifiedKFold(n_splits=n_folds)
+        skf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=0)
         return list(skf.split(self.raw_features, self.y))
+
+    def data_split_loso(self):
+        """Leave-One-Site-Out: each fold leaves one site as test, rest as train."""
+        site_ids = self.pd_dict["SITE_ID"]
+        unique_sites = np.unique(site_ids)
+        splits = []
+        for site in unique_sites:
+            test_ind = np.where(site_ids == site)[0]
+            train_ind = np.where(site_ids != site)[0]
+            if len(test_ind) == 0 or len(train_ind) == 0:
+                continue
+            splits.append((train_ind, test_ind))
+        return splits
 
     def get_node_features(self, train_ind):
         node_ftr = Reader.feature_selection(self.raw_features, self.y, train_ind, self.node_ftr_dim)

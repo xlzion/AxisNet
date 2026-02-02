@@ -6,7 +6,7 @@ from AxisNet_refactor.config.opt import AxisNetOptions
 from AxisNet_refactor.scripts.train_eval import run_cv
 
 
-def build_argv(seed, use_multimodal, microbiome_path, drop_age, drop_sex, model_type="enhanced"):
+def build_argv(seed, use_multimodal, microbiome_path, drop_age, drop_sex, model_type="gcn_transformer"):
     argv = ["--seed", str(seed), "--model_type", model_type]
     if use_multimodal:
         argv.append("--use_multimodal")
@@ -19,7 +19,7 @@ def build_argv(seed, use_multimodal, microbiome_path, drop_age, drop_sex, model_
     return argv
 
 
-def run_one(seed, use_multimodal, microbiome_path, drop_age, drop_sex, model_type="enhanced"):
+def run_one(seed, use_multimodal, microbiome_path, drop_age, drop_sex, model_type="gcn_transformer"):
     argv = build_argv(seed, use_multimodal, microbiome_path, drop_age, drop_sex, model_type)
     opt = AxisNetOptions(argv=argv).initialize()
     return run_cv(opt)
@@ -64,7 +64,7 @@ def main():
         ("drop_sex", False, True),
         ("drop_age_sex", True, True),
     ]
-    model_types = ["enhanced", "transformer", "gcn_transformer"]
+    model_types = ["gcn_transformer"]
 
     for group_name, seeds in seed_groups:
         group_rows_dict = {}

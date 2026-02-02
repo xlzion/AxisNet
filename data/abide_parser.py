@@ -10,12 +10,45 @@ from scipy.spatial import distance
 
 pipeline = "cpac"
 root_folder = "./data"
-data_folder = os.path.join(root_folder, "ABIDE_pcp/cpac/filt_noglobal")
-phenotype = os.path.join(root_folder, "ABIDE_pcp/Phenotypic_V1_0b_preprocessed1.csv")
+_data_folder = None
+_phenotype_path = None
+_subject_ids_path = None
+
+
+def _get_data_folder():
+    global _data_folder
+    if _data_folder is not None:
+        return _data_folder
+    return os.path.join(root_folder, "ABIDE_pcp/cpac/filt_noglobal")
+
+
+def _get_phenotype_path():
+    global _phenotype_path
+    if _phenotype_path is not None:
+        return _phenotype_path
+    return os.path.join(root_folder, "ABIDE_pcp/Phenotypic_V1_0b_preprocessed1.csv")
+
+
+def _get_subject_ids_path():
+    global _subject_ids_path
+    if _subject_ids_path is not None:
+        return _subject_ids_path
+    return os.path.join(_get_data_folder(), "subject_IDs.txt")
+
+
+def set_data_paths(data_folder=None, phenotype_path=None, subject_ids_path=None):
+    """Set paths for ABIDE I/II. None = use default (ABIDE I)."""
+    global _data_folder, _phenotype_path, _subject_ids_path
+    _data_folder = data_folder
+    _phenotype_path = phenotype_path
+    _subject_ids_path = subject_ids_path
+
+
 
 
 def fetch_filenames(subject_IDs, file_type):
     filemapping = {"func_preproc": "_func_preproc.nii.gz", "rois_ho": "_rois_ho.1D"}
+    data_folder = _get_data_folder()
     filenames = []
     for i in range(len(subject_IDs)):
         try:
@@ -35,6 +68,7 @@ def fetch_filenames(subject_IDs, file_type):
 
 
 def get_timeseries(subject_list, atlas_name):
+    data_folder = _get_data_folder()
     timeseries = []
     valid_subjects = []
     for i in range(len(subject_list)):
@@ -60,7 +94,9 @@ def get_timeseries(subject_list, atlas_name):
     return timeseries, valid_subjects
 
 
-def subject_connectivity(timeseries, subject, atlas_name, kind, save=True, save_path=data_folder):
+def subject_connectivity(timeseries, subject, atlas_name, kind, save=True, save_path=None):
+    if save_path is None:
+        save_path = _get_data_folder()
     print("Estimating %s matrix for subject %s" % (kind, subject))
     if kind in ["tangent", "partial correlation", "correlation"]:
         conn_measure = connectome.ConnectivityMeasure(kind=kind)
@@ -76,14 +112,15 @@ def subject_connectivity(timeseries, subject, atlas_name, kind, save=True, save_
 
 
 def get_ids(num_subjects=None):
-    subject_IDs = np.genfromtxt(os.path.join(data_folder, "subject_IDs.txt"), dtype=str)
+    path = _get_subject_ids_path()
+    subject_IDs = np.genfromtxt(path, dtype=str)
     if num_subjects is not None:
         subject_IDs = subject_IDs[:num_subjects]
     return subject_IDs
 
 
 def get_file_id(sub_id):
-    with open(phenotype) as csv_file:
+    with open(_get_phenotype_path()) as csv_file:
         reader = csv.DictReader(csv_file)
         for row in reader:
             if row["SUB_ID"] == str(sub_id):
@@ -93,7 +130,7 @@ def get_file_id(sub_id):
 
 def get_subject_score(subject_list, score):
     scores_dict = {}
-    with open(phenotype) as csv_file:
+    with open(_get_phenotype_path()) as csv_file:
         reader = csv.DictReader(csv_file)
         for row in reader:
             if row["SUB_ID"] in subject_list:
@@ -128,6 +165,7 @@ def site_percentage(train_ind, perc, subject_list):
 
 
 def get_networks(subject_list, kind, atlas_name="aal", variable="connectivity"):
+    data_folder = _get_data_folder()
     all_networks = []
     for subject in subject_list:
         fl = os.path.join(data_folder, subject, subject + "_" + atlas_name + "_" + kind + ".mat")

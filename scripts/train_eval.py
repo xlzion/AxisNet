@@ -2,53 +2,34 @@ import numpy as np
 import torch
 
 from AxisNet_refactor.config.opt import AxisNetOptions
-from AxisNet_refactor.core.axisnet_model import AxisNetGCN, AxisNetFusion
-from AxisNet_refactor.core.transformer_gcn import AxisNetTransformer, AxisNetGcnTransformer
+from AxisNet_refactor.core.transformer_gcn import AxisNetGcnTransformer
 from AxisNet_refactor.utils.metrics import accuracy, auc, prf
 from AxisNet_refactor.data.loader import AxisNetDataLoader
 from AxisNet_refactor.data.multimodal_loader import AxisNetMicrobiomeLoader
 
 
 def build_model(opt, node_ftr_dim, nonimg_dim, microbiome_dim):
-    if opt.model_type == "transformer":
-        return AxisNetTransformer(
-            node_ftr_dim, opt.num_classes, opt.dropout,
-            edge_dropout=opt.edge_dropout, hidden_dim=opt.hidden_dim, num_layers=opt.num_layers,
-            edgenet_input_dim=2 * nonimg_dim,
-            microbiome_dim=microbiome_dim,
-            contrastive_weight=opt.contrastive_weight,
-        ).to(opt.device)
-    if opt.model_type == "gcn_transformer":
-        return AxisNetGcnTransformer(
-            node_ftr_dim, opt.num_classes, opt.dropout,
-            edge_dropout=opt.edge_dropout, hidden_dim=opt.hidden_dim, num_layers=opt.num_layers,
-            edgenet_input_dim=2 * nonimg_dim,
-            microbiome_dim=microbiome_dim,
-            contrastive_weight=opt.contrastive_weight,
-        ).to(opt.device)
-    if opt.use_multimodal:
-        return AxisNetFusion(
-            node_ftr_dim, opt.num_classes, opt.dropout,
-            edge_dropout=opt.edge_dropout, hidden_dim=opt.hidden_dim, num_layers=opt.num_layers,
-            edgenet_input_dim=2 * nonimg_dim,
-            microbiome_dim=microbiome_dim,
-            contrastive_weight=opt.contrastive_weight,
-        ).to(opt.device)
-    return AxisNetGCN(
+    return AxisNetGcnTransformer(
         node_ftr_dim, opt.num_classes, opt.dropout,
         edge_dropout=opt.edge_dropout, hidden_dim=opt.hidden_dim, num_layers=opt.num_layers,
         edgenet_input_dim=2 * nonimg_dim,
+        microbiome_dim=microbiome_dim,
+        contrastive_weight=opt.contrastive_weight,
     ).to(opt.device)
 
 
 def run_cv(opt):
     print("  Loading dataset ...")
-    dl = AxisNetDataLoader()
+    dl = AxisNetDataLoader(
+        data_folder=getattr(opt, "data_folder", None),
+        phenotype_path=getattr(opt, "phenotype_path", None),
+        subject_ids_path=getattr(opt, "subject_ids_path", None),
+    )
 
     if opt.use_multimodal:
-        print("  Loading enhanced multimodal data (fMRI-dominant + microbiome augmentation)...")
-        enhanced_dl = AxisNetMicrobiomeLoader(dl)
-        raw_features, y, nonimg, microbiome_data = enhanced_dl.load_multimodal(
+        print("  Loading multimodal data (fMRI + microbiome)...")
+        mm_loader = AxisNetMicrobiomeLoader(dl)
+        raw_features, y, nonimg, microbiome_data = mm_loader.load_multimodal(
             microbiome_path=opt.microbiome_path,
             similarity_threshold=0.8,
             top_k=opt.microbiome_top_k,
@@ -62,8 +43,16 @@ def run_cv(opt):
         raw_features, y, nonimg = dl.load_data(drop_age=opt.drop_age, drop_sex=opt.drop_sex)
         microbiome_data = None
 
-    n_folds = 10
-    cv_splits = dl.data_split(n_folds)
+    cv_type = getattr(opt, "cv_type", "stratified_kfold")
+    n_folds_arg = getattr(opt, "n_folds", 10)
+    if cv_type == "loso":
+        cv_splits = dl.data_split_loso()
+        n_folds = len(cv_splits)
+        print("  CV strategy: Leave-One-Site-Out ({} folds, one per site)".format(n_folds))
+    else:
+        cv_splits = dl.data_split(n_folds_arg)
+        n_folds = n_folds_arg
+        print("  CV strategy: {}-fold stratified".format(n_folds))
 
     corrects = np.zeros(n_folds, dtype=np.int32)
     accs = np.zeros(n_folds, dtype=np.float32)
@@ -87,7 +76,7 @@ def run_cv(opt):
         if opt.use_multimodal and microbiome_data is not None:
             microbiome_dim = microbiome_data.shape[1]
         else:
-            microbiome_dim = opt.microbiome_dim
+            microbiome_dim = opt.microbiome_pca_dim
 
         model = build_model(opt, node_ftr.shape[1], nonimg.shape[1], microbiome_dim)
 
