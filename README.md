@@ -535,31 +535,26 @@ The batch runner tests:
 - Unimodal vs multimodal
 - 4 phenotype variants: full, drop_age, drop_sex, drop_age_sex
 
-### ABIDE II: Cross-Validation and LOSO
+### ABIDE I (LOSO) and ABIDE II (Cross-Validation)
 
-To run on **ABIDE II** with configurable data paths and CV strategy:
+**ABIDE I: LOSO (Leave-One-Site-Out)** — one site as test each fold:
+```bash
+python scripts/run_abide1_loso.py
+```
 
-**10-fold stratified cross-validation (default):**
+Multimodal LOSO:
+```bash
+python scripts/run_abide1_loso.py --use_multimodal --microbiome_path data/feature-table.biom
+```
+
+**ABIDE II: cross-validation** — configure paths and run stratified K-fold (default 10 folds):
 ```bash
 python scripts/run_abide2_cv.py \
   --data_folder /path/to/ABIDE_II/cpac/filt_noglobal \
   --phenotype_path /path/to/ABIDE_II_phenotype.csv
 ```
 
-**Leave-One-Site-Out (LOSO):** one site as test each fold, rest as train.
-```bash
-python scripts/run_abide2_cv.py \
-  --data_folder /path/to/ABIDE_II/cpac/filt_noglobal \
-  --phenotype_path /path/to/ABIDE_II_phenotype.csv \
-  --cv_type loso
-```
-
 Phenotype CSV should include: `SUB_ID`, `FILE_ID`, `SITE_ID`, `DX_GROUP`, `AGE_AT_SCAN`, `SEX`. Optional: `--subject_ids_path` if subject list is not at `<data_folder>/subject_IDs.txt`. Add `--use_multimodal` and `--microbiome_path` for multimodal runs.
-
-Using the main entrypoint with the same options (ABIDE I or II):
-```bash
-python scripts.train_eval --train=1 --data_folder /path/to/ABIDE_II/... --phenotype_path /path/to/pheno.csv --cv_type loso
-```
 
 ### Programmatic Usage
 
